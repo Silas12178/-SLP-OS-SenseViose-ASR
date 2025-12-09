@@ -1,0 +1,457 @@
+<!--
+============================================================
+ 软件名称：基于 SenseVoice 的 ASR 可视化操作系统
+ 版本号：S-ASR-25.12
+ 作者：Silas
+ 立项日期：2025-11-25
+
+ 版权所有 © 2025 Silas 保留所有权利
+
+ 本页面为系统的前端可视化界面，包含：
+ - 控制面板 UI 设计
+ - 文件识别与监听模式前端逻辑
+ - 配置交互模块
+ - 夜间模式与按钮动态效果
+ - 输出渲染与实时数据轮询
+
+ 页面结构、样式与脚本逻辑均为原创设计，
+ 禁止在未授权情况下复制、修改或商用。
+============================================================
+-->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>ASR语言识别平台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        background-color: #d8e8d1;
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        padding-top: 20px;
+        transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* 夜间模式 */
+    body.dark {
+        background-color: #1f1f1f;
+        color: #dddddd;
+    }
+
+    .container {
+        width: 90%;
+        max-width: 800px;
+    }
+
+    .card {
+        background-color: #c3d9b8;
+        padding: 20px;
+        border-radius: 14px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        transition: background-color 0.3s, box-shadow 0.3s;
+    }
+
+    body.dark .card {
+        background-color: #2b2b2b;
+        box-shadow: 0 4px 12px rgba(255,255,255,0.05);
+    }
+
+    .title {
+        font-size: 20px;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+
+    .btn-row {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    /* 按钮基础 */
+    .btn {
+        flex: 1;
+        text-align: center;
+        padding: 12px 10px;
+        border-radius: 30px;
+        background-color: #7fb77e;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        min-width: 120px;
+        user-select: none;
+        transition: background-color 0.25s ease, transform 0.2s ease,
+                    box-shadow 0.25s ease;
+    }
+
+    /* 悬停高亮 + 放大 + 发光 */
+    .btn:hover {
+        background-color: #6aa56a;
+        transform: translateY(-2px);
+        box-shadow: 0 0 12px rgba(110,180,110,0.7);
+    }
+
+    /* 夜间按钮效果 */
+    body.dark .btn {
+        background-color: #4c6d4c;
+        color: white;
+    }
+
+    body.dark .btn:hover {
+        background-color: #3b573b;
+        box-shadow: 0 0 12px rgba(120,200,120,0.5);
+    }
+
+    #output {
+        width: 100%;
+        height: 220px;
+        border-radius: 10px;
+        padding: 10px;
+        background-color: #eef5ec;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-size: 15px;
+        box-sizing: border-box;
+        transition: background-color 0.3s;
+    }
+
+    body.dark #output {
+        background-color: #2a2a2a;
+        color: #efefef;
+    }
+
+    #fileInput {
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        border: 2px dashed #7fb77e;
+        background-color: #eef5ec;
+        box-sizing: border-box;
+        transition: background-color 0.3s, border-color 0.3s;
+    }
+
+    body.dark #fileInput {
+        background-color: #2a2a2a;
+        border-color: #4c6d4c;
+        color: #ddd;
+    }
+
+    .config-label {
+        font-size: 16px;
+        margin-bottom: 5px;
+        margin-top: 15px;
+        font-weight: bold;
+    }
+
+    .config-input {
+        width: 100%;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #7fb77e;
+        background-color: #f3faf1;
+        margin-bottom: 10px;
+        box-sizing: border-box;
+        transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    }
+
+    body.dark .config-input {
+        background-color: #2a2a2a;
+        border-color: #4c6d4c;
+        color: #ddd;
+    }
+
+    #exitBtn {
+        position: fixed;
+        right: 25px;
+        bottom: 25px;
+        padding: 15px 25px;
+        border-radius: 30px;
+        background-color: #d46a6a;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: background-color 0.25s, transform 0.2s, box-shadow 0.2s;
+    }
+
+    #exitBtn:hover {
+        background-color: #c45858;
+        transform: translateY(-2px);
+        box-shadow: 0 0 12px rgba(200,80,80,0.6);
+    }
+
+    body.dark #exitBtn {
+        background-color: #803f3f;
+    }
+
+    body.dark #exitBtn:hover {
+        background-color: #6b3535;
+    }
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- 控制按钮 -->
+    <div class="card">
+        <div class="title">控制面板</div>
+        <div class="btn-row">
+            <div class="btn" id="modeBtn">文件识别</div>
+            <div class="btn" id="saveConfig">保存配置</div>
+            <div class="btn" id="startFile">开始识别</div>
+            <div class="btn" id="startListen">开始监听</div>
+        </div>
+    </div>
+
+    <!-- 输出 -->
+    <div class="card">
+        <div class="title">输出结果</div>
+        <div id="output"></div>
+    </div>
+
+    <!-- 配置 -->
+    <div class="card">
+        <div class="title">配置项</div>
+
+        <label class="config-label">音频路径（拖拽文件）</label>
+        <input id="fileInput" placeholder="拖动文件到这里" readonly/>
+
+        <!-- 隐藏文件数据 -->
+        <input type="file" id="realFile" style="display:none;">
+
+        <label class="config-label">音量阈值</label>
+        <input class="config-input" id="threshold" placeholder="默认：0.15">
+
+        <label class="config-label">静音时长（秒）</label>
+        <input class="config-input" id="silence" placeholder="默认：0.8">
+
+        <label class="config-label">VAD 模式（0-3）</label>
+        <input class="config-input" id="vadMode" placeholder="默认：3">
+
+        <!-- 噪音抑制开关 -->
+        <label class="config-label">噪音抑制</label>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <div class="btn" id="nrToggle" style="min-width:100px;">关闭</div>
+            <select class="config-input" id="nrMethod" style="flex:1;">
+                <option value="spectral">谱减法</option>
+                <option value="wiener">Wiener 滤波</option>
+            </select>
+        </div>
+
+        <!-- 跳转链接 + 夜间模式 -->
+        <div style="margin-top:15px; text-align:center; font-size:15px;">
+            <a id="nightModeBtn"
+               style="color:#4e6f4f; text-decoration:none; margin-right:25px; cursor:pointer;">
+               夜间模式
+            </a>
+
+            <a href="https://github.com/silas12178"
+                target="_blank"
+                style="color:#4e6f4f; text-decoration:none; margin-right:20px;">
+               项目地址
+            </a>
+
+            <a href="https://www.modelscope.cn/iic/SenseVoiceSmall.git"
+               target="_blank"
+               style="color:#4e6f4f; text-decoration:none;">
+               模型源码
+            </a>
+        </div>
+
+    </div>
+
+</div>
+
+
+<div id="exitBtn">退出</div>
+
+<script>
+    let mode = "file";
+    const fileBox = document.getElementById("fileInput");
+    const realFile = document.getElementById("realFile");
+    let nrEnabled = false;
+
+    function appendOutput(msg) {
+        const box = document.getElementById("output");
+        box.innerText += msg + "\n";
+        box.scrollTop = box.scrollHeight;
+    }
+
+    // ========== 加载配置 ==========
+    async function loadConfig() {
+        let r = await fetch("/config");
+        let j = await r.json();
+
+        document.getElementById("threshold").value = j.volume_threshold;
+        document.getElementById("silence").value = j.silence_duration;
+        document.getElementById("vadMode").value = j.vad_mode;
+
+        nrEnabled = j.nr_enabled;
+        if (nrEnabled) {
+            let btn = document.getElementById("nrToggle");
+            btn.innerText = "开启";
+            btn.style.backgroundColor = "#5c8d5a";
+        }
+
+        document.getElementById("nrMethod").value = j.nr_method;
+    }
+    loadConfig();
+
+    // ========== 噪音抑制开关 ==========
+    document.getElementById("nrToggle").onclick = function () {
+        nrEnabled = !nrEnabled;
+        if (nrEnabled) {
+            this.innerText = "开启";
+            this.style.backgroundColor = "#5c8d5a";
+        } else {
+            this.innerText = "关闭";
+            this.style.backgroundColor = "#7fb77e";
+        }
+    };
+
+    // ========== 模式切换 ==========
+    function updateModeUI() {
+        const fileBtn = document.getElementById("startFile");
+        const listenBtn = document.getElementById("startListen");
+
+        if (mode === "file") {
+            listenBtn.style.opacity = "0.4";
+            listenBtn.style.pointerEvents = "none";
+            fileBtn.style.opacity = "1";
+            fileBtn.style.pointerEvents = "auto";
+        } else {
+            fileBtn.style.opacity = "0.4";
+            fileBtn.style.pointerEvents = "none";
+            listenBtn.style.opacity = "1";
+            listenBtn.style.pointerEvents = "auto";
+        }
+    }
+
+    document.getElementById("modeBtn").onclick = function () {
+        mode = mode === "file" ? "listen" : "file";
+        this.innerText = mode === "file" ? "文件识别" : "实时监听";
+        updateModeUI();
+    };
+    updateModeUI();
+
+    // ========== 拖拽上传 ==========
+    fileBox.addEventListener("dragover", e => {
+        e.preventDefault();
+        fileBox.style.borderColor = "#5c8d5a";
+    });
+
+    fileBox.addEventListener("dragleave", e => {
+        e.preventDefault();
+        fileBox.style.borderColor = "#7fb77e";
+    });
+
+    fileBox.addEventListener("drop", e => {
+        e.preventDefault();
+        fileBox.style.borderColor = "#7fb77e";
+
+        let file = e.dataTransfer.files[0];
+        if (!file) return;
+
+        fileBox.value = file.name;
+        realFile.files = e.dataTransfer.files;
+    });
+
+    // ========== 保存配置 ==========
+    document.getElementById("saveConfig").onclick = async function () {
+        let data = {
+            volume_threshold: document.getElementById("threshold").value || "0.15",
+            silence_duration: document.getElementById("silence").value || "0.8",
+            vad_mode: document.getElementById("vadMode").value || "3",
+            nr_enabled: nrEnabled,
+            nr_method: document.getElementById("nrMethod").value
+        };
+
+        let res = await fetch("/save_config", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data)
+        });
+
+        let j = await res.json();
+        appendOutput("[配置] " + j.message);
+    };
+
+    // ========== 文件识别 ==========
+    document.getElementById("startFile").onclick = async function () {
+        if (mode !== "file") return;
+
+        let file = realFile.files[0];
+        if (!file) {
+            appendOutput("[错误] 未选择文件");
+            return;
+        }
+
+        let form = new FormData();
+        form.append("file", file);
+
+        let res = await fetch("/recognize_file", {
+            method: "POST",
+            body: form
+        });
+
+        let j = await res.json();
+        if (j.ok) {
+            appendOutput("[文件识别] " + j.text);
+        } else {
+            appendOutput("[错误] " + j.message);
+        }
+    };
+
+    // ========== 监听 ==========
+    document.getElementById("startListen").onclick = async function () {
+        if (mode !== "listen") return;
+
+        let r = await fetch("/start_listen", {method:"POST"});
+        let j = await r.json();
+        appendOutput("[监听] " + j.message);
+    };
+
+    // ========== 实时结果 ==========
+    setInterval(async () => {
+        if (mode !== "listen") return;
+
+        let r = await fetch("/stream_results");
+        let j = await r.json();
+
+        if (j.ok && j.lines && j.lines.length > 0) {
+            j.lines.forEach(t => appendOutput("[实时] " + t));
+        }
+    }, 500);
+
+    // ========== 夜间模式 ==========
+    const nightBtn = document.getElementById("nightModeBtn");
+    nightBtn.onclick = function () {
+        let isDark = document.body.classList.toggle("dark");
+        nightBtn.innerText = isDark ? "日间模式" : "夜间模式";
+    };
+
+    // ========== 退出 ==========
+    document.getElementById("exitBtn").onclick = async function () {
+        await fetch("/shutdown", {method:"POST"});
+
+        window.open('', '_self');
+        window.close();
+
+        setTimeout(() => {
+            window.location.href = "about:blank";
+        }, 100);
+    };
+</script>
+
+</body>
+</html>

@@ -1,0 +1,7 @@
+flask
+funasr
+torch
+numpy
+pyaudio
+webrtcvad
+librosa
